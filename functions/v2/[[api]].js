@@ -22,29 +22,30 @@ export async function onRequest(context) {
     body: request.body,
     redirect: isDockerHub ? 'manual' : 'follow',
   });
-  const registryResponse = await fetch(registryRequest);
-  if (registryResponse.status === 307 && isDockerHub) {
-    const location = registryResponse.headers.get('location');
+  let registryResponse = await fetch(registryRequest);
+  let location;
+  if (registryResponse.status === 307 && isDockerHub) {// fetch s3 blob
+    location = registryResponse.headers.get('location');
     registryRequest = new Request(location, {
-      method: request.method,
-      headers: headers,
-      body: request.body,
+      method: 'GET',
       redirect: 'follow',
     });
+    registryResponse = await fetch(registryRequest);
   }
   const isDebug = context.env.DEBUG === 'true';
   
   if (isDebug) {
     const responseCloned = registryResponse.clone();
     let body = '';
-    if (registryResponse.headers.get('content-type').includes('application')) {
+    if (registryResponse.headers.get('content-type').includes('json')) {
       body = await responseCloned.text();
     }
     console.log(
       'req on',
       request.url,
+      location,
       registryResponse.status,
-      'req headers', JSON.stringify(Object.fromEntries(new Map(request.headers))),
+      'req headers', JSON.stringify(Object.fromEntries(new Map(headers.entries()))),
       'res headers', JSON.stringify(Object.fromEntries(new Map(registryResponse.headers))),
       body,
     );
